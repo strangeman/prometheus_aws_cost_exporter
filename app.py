@@ -17,10 +17,10 @@ if os.environ.get('METRIC_TODAY_DAILY_COSTS') is not None:
     g_cost = Gauge('aws_today_daily_costs', 'Today daily costs from AWS')
 if os.environ.get('METRIC_YESTERDAY_DAILY_COSTS') is not None:
     g_yesterday = Gauge('aws_yesterday_daily_costs', 'Yesterday daily costs from AWS')
-if os.environ.get('METRIC_TODAY_DAILY_USAGE') is not None:
-    g_usage = Gauge('aws_today_daily_usage', 'Today daily usage from AWS')
-if os.environ.get('METRIC_TODAY_DAILY_USAGE_NORM') is not None:
-    g_usage_norm = Gauge('aws_today_daily_usage_norm', 'Today daily usage normalized from AWS')
+if os.environ.get('METRIC_MONTH_TO_DATE_COSTS') is not None:
+    g_mtd = Gauge('aws_month_to_date_costs', 'Month to date costs.')
+if os.environ.get('METRIC_MONTH_FORCASTED_COSTS') is not None:
+    g_month_forcast = Gauge('aws_month_forcasted_costs', 'Monthly forcasted cost.')
 
 scheduler = BackgroundScheduler()
 
@@ -28,13 +28,14 @@ def aws_query():
     print("Calculating costs...")
     now = datetime.now()
     yesterday = datetime.today() - timedelta(days=1)
+    tomorrow = datetime.today() + timedelta(days=1)
     two_days_ago = datetime.today() - timedelta(days=2)
     if os.environ.get('METRIC_TODAY_DAILY_COSTS') is not None:
 
         r = client.get_cost_and_usage(
             TimePeriod={
-                'Start': yesterday.strftime("%Y-%m-%d"),
-                'End':  now.strftime("%Y-%m-%d")
+                'Start': now.strftime("%Y-%m-%d"),
+                'End':  tomorrow.strftime("%Y-%m-%d")
             },
             Granularity="DAILY",
             Metrics=["BlendedCost"]
@@ -46,8 +47,8 @@ def aws_query():
     if os.environ.get('METRIC_YESTERDAY_DAILY_COSTS') is not None:
         r = client.get_cost_and_usage(
             TimePeriod={
-                'Start': two_days_ago.strftime("%Y-%m-%d"),
-                'End':  yesterday.strftime("%Y-%m-%d")
+                'Start': yesterday.strftime("%Y-%m-%d"),
+                'End':  now.strftime("%Y-%m-%d")
             },
             Granularity="DAILY",
             Metrics=["BlendedCost"]
@@ -56,38 +57,34 @@ def aws_query():
         print("Yesterday's AWS Daily costs: %s" %(cost_yesterday))
         g_yesterday.set(float(cost_yesterday))
 
-
-    if os.environ.get('METRIC_TODAY_DAILY_USAGE') is not None:
+    if os.environ.get('METRIC_MONTH_TO_DATE_COSTS') is not None:
         r = client.get_cost_and_usage(
             TimePeriod={
-                'Start': yesterday.strftime("%Y-%m-%d"),
-                'End':  now.strftime("%Y-%m-%d")
+                'Start': now.strftime("%Y-%m-01"),
+                'End':  tomorrow.strftime("%Y-%m-%d")
             },
-            Granularity="DAILY",
-            Metrics=["UsageQuantity"]
+            Granularity="MONTHLY",
+            Metrics=["BlendedCost"]
         )
-        usage = r["ResultsByTime"][0]["Total"]["UsageQuantity"]["Amount"]
-        print("Updated AWS Daily Usage: %s" %(usage))
-        g_usage.set(float(usage))
-
-    if os.environ.get('METRIC_TODAY_DAILY_USAGE_NORM') is not None:
-
-        r = client.get_cost_and_usage(
+        cost_mtd = r["ResultsByTime"][0]["Total"]["BlendedCost"]["Amount"]
+        print("Updated Month to date Usage: %s" %(cost_mtd))
+        g_mtd.set(float(cost_mtd))
+        
+    if os.environ.get('METRIC_MONTH_FORCASTED_COSTS') is not None:
+        r = client.get_cost_forecast(
             TimePeriod={
-                'Start': yesterday.strftime("%Y-%m-%d"),
-                'End':  now.strftime("%Y-%m-%d")
+                'Start': now.strftime("%Y-%m-%d"),
+                'End': '2022-04-01'
             },
-            Granularity="DAILY",
-            Metrics=["NormalizedUsageAmount"]
-        )
-        usage_norm = r["ResultsByTime"][0]["Total"]["NormalizedUsageAmount"]["Amount"]
-        print("Updated AWS Daily Usage Norm: %s" %(usage_norm))
-        g_usage_norm.set(float(usage_norm))
+            Metric='UNBLENDED_COST',
+            Granularity='MONTHLY'
+            )
+        cost_month_forcast = r["Total"]["Amount"]
+        print("This Month's forecasted cost: %s" %(cost_month_forcast))
+        g_month_forcast.set(float(cost_month_forcast))
 
     print("Finished calculating costs")
-
     return 0
-
 
 @app.route('/metrics/')
 def metrics():
@@ -96,6 +93,8 @@ def metrics():
 @app.route('/health')
 def health():
     return "OK"
+    
+# aws_query()
 
 scheduler.start()
 scheduler.add_job(
