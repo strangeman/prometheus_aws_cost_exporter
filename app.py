@@ -25,11 +25,16 @@ if os.environ.get('METRIC_MONTH_FORCASTED_COSTS') is not None:
 scheduler = BackgroundScheduler()
 
 def aws_query():
-    print("Calculating costs...")
+    
     now = datetime.now()
     yesterday = datetime.today() - timedelta(days=1)
     tomorrow = datetime.today() + timedelta(days=1)
     two_days_ago = datetime.today() - timedelta(days=2)
+    nxt_mnth = now.replace(day=28) + timedelta(days=4)
+    firstday_of_nxt_mnth = nxt_mnth.strftime("%Y-%m-01")
+    
+    print("Calculating costs...")
+    
     if os.environ.get('METRIC_TODAY_DAILY_COSTS') is not None:
 
         r = client.get_cost_and_usage(
@@ -45,6 +50,7 @@ def aws_query():
         g_cost.set(float(cost))
 
     if os.environ.get('METRIC_YESTERDAY_DAILY_COSTS') is not None:
+        
         r = client.get_cost_and_usage(
             TimePeriod={
                 'Start': yesterday.strftime("%Y-%m-%d"),
@@ -58,23 +64,25 @@ def aws_query():
         g_yesterday.set(float(cost_yesterday))
 
     if os.environ.get('METRIC_MONTH_TO_DATE_COSTS') is not None:
+        
         r = client.get_cost_and_usage(
             TimePeriod={
                 'Start': now.strftime("%Y-%m-01"),
-                'End':  tomorrow.strftime("%Y-%m-%d")
+                'End':  firstday_of_nxt_mnth
             },
             Granularity="MONTHLY",
-            Metrics=["BlendedCost"]
+            Metrics=["UnblendedCost"]
         )
-        cost_mtd = r["ResultsByTime"][0]["Total"]["BlendedCost"]["Amount"]
-        print("Updated Month to date Usage: %s" %(cost_mtd))
+        cost_mtd = r["ResultsByTime"][0]["Total"]["UnblendedCost"]["Amount"]
+        print("Updated Month to date Cost: %s" %(cost_mtd))
         g_mtd.set(float(cost_mtd))
         
     if os.environ.get('METRIC_MONTH_FORCASTED_COSTS') is not None:
+        
         r = client.get_cost_forecast(
             TimePeriod={
                 'Start': now.strftime("%Y-%m-%d"),
-                'End': '2022-04-01'
+                'End': firstday_of_nxt_mnth
             },
             Metric='UNBLENDED_COST',
             Granularity='MONTHLY'
