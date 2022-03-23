@@ -7,7 +7,7 @@ import atexit
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-QUERY_PERIOD = os.getenv('QUERY_PERIOD', "1800")
+QUERY_PERIOD = os.getenv('QUERY_PERIOD', "5400")
 
 app = Flask(__name__)
 CONTENT_TYPE_LATEST = str('text/plain; version=0.0.4; charset=utf-8')
@@ -17,6 +17,7 @@ if os.environ.get('METRIC_TODAY_DAILY_COSTS') is not None:
     g_cost = Gauge('aws_today_daily_costs', 'Today daily costs from AWS')
 if os.environ.get('METRIC_YESTERDAY_DAILY_COSTS') is not None:
     g_yesterday = Gauge('aws_yesterday_daily_costs', 'Yesterday daily costs from AWS')
+    g_yesterday_by_service = Gauge("aws_yesterday_costs_by_service", 'Yesterday daily costs from AWS by service', ['aws_service'])
 if os.environ.get('METRIC_MONTH_TO_DATE_COSTS') is not None:
     g_mtd = Gauge('aws_month_to_date_costs', 'Month to date costs.')
 if os.environ.get('METRIC_MONTH_FORCASTED_COSTS') is not None:
@@ -62,6 +63,29 @@ def aws_query():
         cost_yesterday = r["ResultsByTime"][0]["Total"]["BlendedCost"]["Amount"]
         print("Yesterday's AWS Daily costs: %s" %(cost_yesterday))
         g_yesterday.set(float(cost_yesterday))
+        
+        r = client.get_cost_and_usage(
+            TimePeriod={
+                'Start': yesterday.strftime("%Y-%m-%d"),
+                'End':  now.strftime("%Y-%m-%d")
+            },
+            Granularity="DAILY",
+            Metrics=["BlendedCost"],
+            GroupBy=[
+                {
+                    'Type': 'DIMENSION',
+                    'Key': 'SERVICE'
+                }    
+            ]
+        )
+        
+        services = r["ResultsByTime"][0]["Groups"]
+        # services = sorted(services, key = lambda i: i['Metrics']['BlendedCost']['Amount'])
+        
+        for service in services:
+            service_name = service.get('Keys')[0]
+            service_cost = service.get('Metrics')['BlendedCost']['Amount']
+            g_yesterday_by_service.labels(service_name).set(float(service_cost))
 
     if os.environ.get('METRIC_MONTH_TO_DATE_COSTS') is not None:
         
