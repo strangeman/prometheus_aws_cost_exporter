@@ -125,13 +125,13 @@ def metrics():
 @app.route('/health')
 def health():
     return "OK"
-    
-# aws_query()
+
+print("Job starts at: " + str(datetime.now() + timedelta(seconds=10)) )
 
 scheduler.start()
 scheduler.add_job(
     func=aws_query,
-    trigger=IntervalTrigger(seconds=int(QUERY_PERIOD),start_date=(datetime.now() + timedelta(seconds=5))),
+    trigger=IntervalTrigger(seconds=int(QUERY_PERIOD),start_date=(datetime.now() + timedelta(seconds=10))),
     id='aws_query',
     name='Run AWS Query',
     replace_existing=True
