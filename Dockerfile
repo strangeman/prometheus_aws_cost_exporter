@@ -1,6 +1,6 @@
 FROM python:3.6-alpine
 RUN apk update && apk add tzdata
-ENV TZ="Asia/Kolkata"
+ENV TZ="Etc/GMT+3"
 WORKDIR /usr/src/app
 
 COPY requirements.txt ./
