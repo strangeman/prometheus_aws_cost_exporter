@@ -1,4 +1,4 @@
-image: registry.your-org.org/aws-cost-exporter:v0.1
+image: registry.your-org.org/aws-cost-exporter:v0.2.0
 svcAnnotations:
   prometheus.io/scrape: "true"
   prometheus.io/port: "5000"

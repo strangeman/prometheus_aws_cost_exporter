@@ -7,24 +7,6 @@ import atexit
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-QUERY_PERIOD = os.getenv('QUERY_PERIOD', "5400")
-
-app = Flask(__name__)
-CONTENT_TYPE_LATEST = str('text/plain; version=0.0.4; charset=utf-8')
-client = boto3.client('ce')
-
-if os.environ.get('METRIC_TODAY_DAILY_COSTS') is not None:
-    g_cost = Gauge('aws_today_daily_costs', 'Today daily costs from AWS')
-if os.environ.get('METRIC_YESTERDAY_DAILY_COSTS') is not None:
-    g_yesterday = Gauge('aws_yesterday_daily_costs', 'Yesterday daily costs from AWS')
-    g_yesterday_by_service = Gauge("aws_yesterday_costs_by_service", 'Yesterday daily costs from AWS by service', ['aws_service'])
-if os.environ.get('METRIC_MONTH_TO_DATE_COSTS') is not None:
-    g_mtd = Gauge('aws_month_to_date_costs', 'Month to date costs.')
-if os.environ.get('METRIC_MONTH_FORCASTED_COSTS') is not None:
-    g_month_forcast = Gauge('aws_month_forcasted_costs', 'Monthly forcasted cost.')
-
-scheduler = BackgroundScheduler()
-
 def aws_query():
     
     now = datetime.now()
@@ -118,13 +100,35 @@ def aws_query():
     print("Finished calculating costs")
     return 0
 
-@app.route('/metrics/')
-def metrics():
-    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+app = Flask(__name__)
 
-@app.route('/health')
-def health():
-    return "OK"
+CONTENT_TYPE_LATEST = str('text/plain; version=0.0.4; charset=utf-8')
+client = boto3.client('ce')
+
+METRIC_TODAY_DAILY_COSTS=os.environ.get('METRIC_TODAY_DAILY_COSTS')
+METRIC_YESTERDAY_DAILY_COSTS=os.environ.get('METRIC_YESTERDAY_DAILY_COSTS')
+METRIC_MONTH_TO_DATE_COSTS=os.environ.get('METRIC_MONTH_TO_DATE_COSTS')
+METRIC_MONTH_FORCASTED_COSTS=os.environ.get('METRIC_MONTH_FORCASTED_COSTS')
+QUERY_PERIOD=os.getenv('QUERY_PERIOD', "5400")
+
+if METRIC_TODAY_DAILY_COSTS is not None:
+    g_cost = Gauge('aws_today_daily_costs', 'Today daily costs from AWS')
+if METRIC_YESTERDAY_DAILY_COSTS is not None:
+    g_yesterday = Gauge('aws_yesterday_daily_costs', 'Yesterday daily costs from AWS')
+    g_yesterday_by_service = Gauge("aws_yesterday_costs_by_service", 'Yesterday daily costs from AWS by service', ['aws_service'])
+if METRIC_MONTH_TO_DATE_COSTS is not None:
+    g_mtd = Gauge('aws_month_to_date_costs', 'Month to date costs.')
+if METRIC_MONTH_FORCASTED_COSTS is not None:
+    g_month_forcast = Gauge('aws_month_forcasted_costs', 'Monthly forcasted cost.')
+
+print(f"METRIC_TODAY_DAILY_COSTS: {METRIC_TODAY_DAILY_COSTS}")
+print(f"METRIC_YESTERDAY_DAILY_COSTS: {METRIC_YESTERDAY_DAILY_COSTS}")
+print(f"METRIC_MONTH_TO_DATE_COSTS: {METRIC_MONTH_TO_DATE_COSTS}")
+print(f"METRIC_MONTH_FORCASTED_COSTS: {METRIC_MONTH_FORCASTED_COSTS}")
+print(f"QUERY_PERIOD: {QUERY_PERIOD}")
+print(f"AWS_ACCESS_KEY_ID: {os.environ.get('AWS_ACCESS_KEY_ID')}")
+
+scheduler = BackgroundScheduler()
 
 print("Job starts at: " + str(datetime.now() + timedelta(seconds=10)) )
 
@@ -138,3 +142,14 @@ scheduler.add_job(
     )
 # Shut down the scheduler when exiting the app
 atexit.register(lambda: scheduler.shutdown())
+
+@app.route('/metrics/')
+def metrics():
+    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+
+@app.route('/health')
+def health():
+    return "OK"
+
+if __name__ == '__main__':
+    app.run()

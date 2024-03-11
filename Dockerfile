@@ -1,12 +1,29 @@
-FROM python:3.6-alpine
-RUN apk update && apk add tzdata
-ENV TZ="Asia/Kolkata"
-WORKDIR /usr/src/app
+FROM python:3.11-slim as builder 
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Use a less-privileged user for the runtime image
+RUN adduser --shell /bin/bash --home /app appuser
+USER appuser
 
+# Working directory: Create an app directory
+WORKDIR /app
+
+ENV FLASK_APP=app/app.py
+ENV PATH=$PATH:/app/.local/bin
+
+# Copy project requirements
+COPY pyproject.toml poetry.lock ./
+
+# Install Poetry 
+RUN pip install poetry
+
+# Install dependencies 
+RUN poetry install --no-dev 
+
+# Copy the rest of application code
 COPY . .
-ENV FLASK_APP app.py
-ENTRYPOINT [ "flask", "run", "--host=0.0.0.0" ]
-CMD []
+
+# Expose application's port
+EXPOSE 5000
+
+# Command to run the application
+CMD ["poetry", "run", "flask", "run", "--host", "0.0.0.0"]
