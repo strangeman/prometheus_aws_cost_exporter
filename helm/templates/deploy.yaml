@@ -65,3 +65,9 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
           timeoutSeconds: 10
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+      {{- range $key, $value := .Values.nodeSelector }}
+        {{ $key }}: {{ $value | quote }}
+      {{- end }}
+      {{- end }}

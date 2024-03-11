@@ -9,6 +9,7 @@ WORKDIR /app
 
 ENV FLASK_APP=app/app.py
 ENV PATH=$PATH:/app/.local/bin
+ENV TZ="Etc/GMT+3"
 
 # Copy project requirements
 COPY pyproject.toml poetry.lock ./
