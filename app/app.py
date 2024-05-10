@@ -63,7 +63,7 @@ def aws_query():
         
         services = r["ResultsByTime"][0]["Groups"]
         # services = sorted(services, key = lambda i: i['Metrics']['BlendedCost']['Amount'])
-        
+        g_yesterday_by_service.clear()
         for service in services:
             service_name = service.get('Keys')[0]
             service_cost = service.get('Metrics')['BlendedCost']['Amount']
