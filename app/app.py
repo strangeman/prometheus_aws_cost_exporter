@@ -6,6 +6,7 @@ import atexit
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from aws import AWS
+from gcp import GCP
 
 app = Flask(__name__)
 
@@ -22,13 +23,22 @@ print("Job starts at: " + str(datetime.now() + timedelta(seconds=10)) )
 
 scheduler.start()
 
-# TODO make this optional
+# TODO switch to yaml config
 aws_client = AWS()
 scheduler.add_job(
     func=aws_client.fill_metrics,
     trigger=IntervalTrigger(seconds=int(QUERY_PERIOD),start_date=(datetime.now() + timedelta(seconds=10))),
     id='aws_query',
     name='Run AWS Query',
+    replace_existing=True
+    )
+
+gcp_client = GCP()
+scheduler.add_job(
+    func=gcp_client.fill_metrics,
+    trigger=IntervalTrigger(seconds=int(QUERY_PERIOD),start_date=(datetime.now() + timedelta(seconds=10))),
+    id='gcp_query',
+    name='Run GCP Query',
     replace_existing=True
     )
 
