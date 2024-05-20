@@ -6,8 +6,6 @@ svcAnnotations:
   prometheus.io/path: "/metrics"
 podAnnotations:
 env:
- METRIC_TODAY_DAILY_COSTS: true
- METRIC_YESTERDAY_DAILY_COSTS: true
- METRIC_MONTH_TO_DATE_COSTS: true
- METRIC_MONTH_FORCASTED_COSTS: true
- QUERY_PERIOD: 1800
+  QUERY_PERIOD: 1800
+  AWS_ENABLED: "true"
+  GCP_ENABLED: "true"

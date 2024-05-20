@@ -1,4 +1,4 @@
-FROM python:3.11-slim as builder 
+FROM python:3.12-slim as builder 
 
 # Use a less-privileged user for the runtime image
 RUN adduser --shell /bin/bash --home /app appuser

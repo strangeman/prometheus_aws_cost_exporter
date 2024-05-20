@@ -35,4 +35,3 @@ Configuration is made through environment variables:
     ]
 }
 ```
-

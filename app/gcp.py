@@ -2,11 +2,15 @@ from google.cloud import bigquery
 from datetime import datetime, timedelta
 from prometheus_client import Gauge
 import os
+import json
+from google.oauth2 import service_account
 
 class GCP:
     
+    json_account_info = json.loads(os.environ.get('GOOGLE_CREDENTIALS'))  # convert JSON to dictionary
+    credentials = service_account.Credentials.from_service_account_info(json_account_info)
     # Configure BigQuery client
-    client = bigquery.Client()
+    client = bigquery.Client(credentials=credentials)
     
     # Set project ID and dataset where billing data resides
     GCP_BQ_BILLING_PROJECT = os.environ.get('GCP_BQ_BILLING_PROJECT')
