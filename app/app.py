@@ -5,8 +5,8 @@ import os
 import atexit
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from aws import AWS
-from gcp import GCP
+from app.aws import AWS
+from app.gcp import GCP
 
 app = Flask(__name__)
 
