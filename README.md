@@ -17,6 +17,8 @@ Configuration is made through environment variables:
 | GCP_ENABLED | Enable GCP metrics gathering      |   False |
 | GCP_BQ_BILLING_PROJECT | Name of GCP project with BQ billing dataset      |   False |
 | GCP_BQ_DATASET_ID | Name of billing dataset in BQ      |   False |
+| SERVERSCOM_ENABLED | Enable Servers.com metrics gathering      |   False |
+| SERVERSCOM_TOKEN | Servers.com API token      |   None |
 
 ## Quickstart
 

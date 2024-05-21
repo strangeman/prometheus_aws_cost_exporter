@@ -7,6 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from app.aws import AWS
 from app.gcp import GCP
+from app.serverscom import Serverscom
 
 app = Flask(__name__)
 
@@ -39,6 +40,15 @@ scheduler.add_job(
     trigger=IntervalTrigger(seconds=int(QUERY_PERIOD),start_date=(datetime.now() + timedelta(seconds=10))),
     id='gcp_query',
     name='Run GCP Query',
+    replace_existing=True
+    )
+
+serverscom_client = Serverscom()
+scheduler.add_job(
+    func=serverscom_client.fill_metrics,
+    trigger=IntervalTrigger(seconds=int(QUERY_PERIOD),start_date=(datetime.now() + timedelta(seconds=10))),
+    id='serverscom_query',
+    name='Run Servers.com Query',
     replace_existing=True
     )
 
