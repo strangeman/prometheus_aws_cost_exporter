@@ -7,7 +7,11 @@ import os
 SERVERSCOM_TOKEN = os.environ.get("SERVERSCOM_TOKEN")
 SERVERSCOM_ENABLED = os.environ.get("SERVERSCOM_ENABLED", default=False)
 
+
 class Serverscom:
+    
+    serverscom_monthly_expenses = Gauge("serverscom_monthly_expenses", 'Monthly expenses from servers.com', ['month_year'])
+    
     def __init__(self):
         self.monthly_expenses = defaultdict(float)
 
@@ -47,8 +51,7 @@ class Serverscom:
             print(f"{datetime.now()} Servers.com is not enabled.")
             return
         print(f"{datetime.now()} Calculating Servers.com costs...")
-        serverscom_monthly_expenses = Gauge("serverscom_monthly_expenses", 'Monthly expenses from servers.com', ['month_year'])
-        serverscom_monthly_expenses.clear()
+        self.serverscom_monthly_expenses.clear()
         for month_year, expense in self.get_serverscom_monthly_expenses().items():
-            serverscom_monthly_expenses.labels(month_year).set(float(expense))
+            self.serverscom_monthly_expenses.labels(month_year).set(float(expense))
         print(f"{datetime.now()} Finished calculating Servers.com costs.")

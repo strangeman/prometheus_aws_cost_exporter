@@ -14,6 +14,12 @@ class AWS:
     AWS_ENABLED=os.environ.get('AWS_ENABLED', default=False)
     print(f"AWS_ENABLED: {AWS_ENABLED}")
 
+    aws_today_daily_costs = Gauge('aws_today_daily_costs', 'Today daily costs from AWS')
+    aws_yesterday_daily_costs = Gauge('aws_yesterday_daily_costs', 'Yesterday daily costs from AWS')
+    aws_yesterday_costs_by_service = Gauge("aws_yesterday_costs_by_service", 'Yesterday daily costs from AWS by service', ['aws_service'])
+    aws_month_to_date_costs = Gauge('aws_month_to_date_costs', 'Month to date costs.')
+    aws_month_forecasted_costs = Gauge('aws_month_forecasted_costs', 'Monthly forecasted cost.')
+
     def __init__(self):
         """
         Initializes an instance of the AWS class.
@@ -116,7 +122,7 @@ class AWS:
             )
         cost = r["Total"]["Amount"]
         return float(cost)
-
+    
     def fill_metrics(self):
         """
         Fills the Prometheus metrics with the AWS costs.
@@ -129,22 +135,18 @@ class AWS:
 
         print(f"{datetime.now()} Calculating AWS costs...")
 
-        aws_today_daily_costs = Gauge('aws_today_daily_costs', 'Today daily costs from AWS')
-        aws_today_daily_costs.set(self.get_today_daily_costs())
+        self.aws_today_daily_costs.set(self.get_today_daily_costs())
 
-        aws_yesterday_daily_costs = Gauge('aws_yesterday_daily_costs', 'Yesterday daily costs from AWS')
-        aws_yesterday_daily_costs.set(self.get_yesterday_daily_costs())
-        aws_yesterday_costs_by_service = Gauge("aws_yesterday_costs_by_service", 'Yesterday daily costs from AWS by service', ['aws_service'])
-        aws_yesterday_costs_by_service.clear()
+        self.aws_yesterday_daily_costs.set(self.get_yesterday_daily_costs())
+
+        self.aws_yesterday_costs_by_service.clear()
         for service in self.get_yesterday_daily_costs_by_service():
             service_name = service.get('Keys')[0]
             service_cost = service.get('Metrics')['BlendedCost']['Amount']
-            aws_yesterday_costs_by_service.labels(service_name).set(float(service_cost))
+            self.aws_yesterday_costs_by_service.labels(service_name).set(float(service_cost))
 
-        aws_month_to_date_costs = Gauge('aws_month_to_date_costs', 'Month to date costs.')
-        aws_month_to_date_costs.set(self.get_month_to_date_costs())
+        self.aws_month_to_date_costs.set(self.get_month_to_date_costs())
 
-        aws_month_forecasted_costs = Gauge('aws_month_forecasted_costs', 'Monthly forecasted cost.')
-        aws_month_forecasted_costs.set(self.get_month_forecasted_costs())
+        self.aws_month_forecasted_costs.set(self.get_month_forecasted_costs())
 
         print(f"{datetime.now()} Finished calculating AWS costs...")

@@ -17,6 +17,9 @@ class GCP:
     GCP_BQ_DATASET_ID = os.environ.get('GCP_BQ_DATASET_ID')
     GCP_ENABLED=os.environ.get('GCP_ENABLED', default=False)
 
+    gcp_yesterday_costs_by_service = Gauge("gcp_yesterday_costs_by_service", 'Yesterday daily costs from gcp by service', ['gcp_service', 'gcp_project'])
+
+
     def __init__(self):
         """
         Initializes an instance of the GCP class.
@@ -78,11 +81,10 @@ class GCP:
             print(f"{datetime.now()} GCP is not enabled.")
             return
         print(f"{datetime.now()} Calculating GCP costs...")
-        gcp_yesterday_costs_by_service = Gauge("gcp_yesterday_costs_by_service", 'Yesterday daily costs from gcp by service', ['gcp_service', 'gcp_project'])
-        gcp_yesterday_costs_by_service.clear()
+        self.gcp_yesterday_costs_by_service.clear()
         for service in self.get_costs_by_day(datetime.today()-timedelta(days=1)):
             service_name = service.service_description
             project = service.project_name
             service_cost = service.subtotal
-            gcp_yesterday_costs_by_service.labels(service_name, project).set(float(service_cost))
+            self.gcp_yesterday_costs_by_service.labels(service_name, project).set(float(service_cost))
         print(f"{datetime.now()} Finished calculating GCP costs...")
