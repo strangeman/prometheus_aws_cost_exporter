@@ -15,10 +15,10 @@ ENV TZ="Etc/GMT+3"
 COPY pyproject.toml poetry.lock ./
 
 # Install Poetry 
-RUN pip install poetry
+RUN pip install poetry==1.8.2
 
 # Install dependencies 
-RUN poetry install --no-dev 
+RUN poetry install
 
 # Copy the rest of application code
 COPY . .
