@@ -152,9 +152,20 @@ from its SQS interruption queue.
 
 ## Development
 
+Python **3.14** and Poetry **>= 2.0** are required. A distro-packaged Poetry is
+frequently broken against a rolling Python; install it into its own venv:
+
 ```sh
-python3 -m venv .venv && .venv/bin/pip install boto3 prometheus-client pytest
-.venv/bin/python -m pytest tests/
+pipx install poetry           # or: python3 -m venv ~/.venvs/poetry && ~/.venvs/poetry/bin/pip install poetry
+poetry install                # creates ./.venv with runtime + dev dependencies
+poetry run pytest tests/
 ```
 
 The savings tests mock every boto3 client, so they need no AWS credentials.
+
+To refresh the pinned dependency set:
+
+```sh
+poetry update                 # respects the ranges in pyproject.toml
+poetry check --lock           # verify poetry.lock matches pyproject.toml
+```

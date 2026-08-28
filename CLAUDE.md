@@ -5,23 +5,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```sh
-# Full dependency set (Flask, GCP, etc.)
-poetry install
+# Poetry >= 2.0 is required (pyproject.toml is PEP 621, not the legacy
+# [tool.poetry] layout). Do not rely on a distro-packaged poetry — install it
+# into its own venv: pipx install poetry
+poetry install                 # creates ./.venv (Python 3.14) with dev deps
 
-# Tests only need boto3 + prometheus-client + pytest; the savings tests mock
-# every boto3 client, so no AWS credentials are required.
-python3 -m venv .venv && .venv/bin/pip install boto3 prometheus-client pytest
-.venv/bin/python -m pytest tests/
-.venv/bin/python -m pytest tests/test_savings.py::test_spot_costs_skip_groups_with_no_usage   # single test
+poetry run pytest tests/
+poetry run pytest tests/test_savings.py::test_spot_costs_skip_groups_with_no_usage   # single test
 
 # Run locally (needs the provider env vars below)
-FLASK_APP=app/app.py poetry run flask run --host 0.0.0.0    # :5000
+poetry run flask run --host 0.0.0.0    # :5000
 
 docker build -t aws-cost-exporter .
 helm install prometheus-aws-cost-exporter ./helm    # see helm/values.yaml for image + env
 ```
 
-There is no linter or formatter configured.
+Python 3.14 only (`requires-python = ">=3.14,<4.0"`); the image is built on
+`python:3.14-slim`. There is no linter or formatter configured.
 
 ## Architecture
 
@@ -66,6 +66,13 @@ Savings Plan, an instance type you stopped running) linger forever.
   account-wide total.
 - **Everything in `savings.py` is month-to-date.** Those gauges climb through the month
   and reset on the 1st; they are read directly, never through `rate()`/`increase()`.
+- **`pyproject.toml` lists only direct imports.** Transitive pins (botocore's
+  `jmespath`/`s3transfer`, Flask's `werkzeug`/`jinja2`/`click`, …) live in
+  `poetry.lock` only — do not re-add them as top-level dependencies.
+- **The Dockerfile is two-stage and installs with `--no-root`.** The builder
+  copies only `pyproject.toml`/`poetry.lock`, so the root package cannot be
+  built there; the runtime stage gets `/app/.venv` plus `app/` and runs
+  `flask` from the venv directly (no `poetry` in the final image).
 - Naming split in the savings metrics: `aws_savings_plan_*` (singular) is per plan and
   always carries `savings_plan_id`; `aws_savings_plans_*` (plural) is the account total.
 
