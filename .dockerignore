@@ -1,2 +1,10 @@
+.git
+.venv
+.pytest_cache
+__pycache__
+*.py[cod]
 app/.env
 .env
+tests
+grafana
+helm

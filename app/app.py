@@ -6,6 +6,7 @@ import atexit
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from app.aws import AWS
+from app.savings import Savings
 from app.gcp import GCP
 from app.serverscom import Serverscom
 
@@ -13,9 +14,13 @@ app = Flask(__name__)
 
 CONTENT_TYPE_LATEST = str('text/plain; version=0.0.4; charset=utf-8')
 QUERY_PERIOD=os.getenv('QUERY_PERIOD', "5400")
+# Cost Explorer bills per request and refreshes once a day, so the savings
+# metrics run far less often than the cost ones.
+SAVINGS_QUERY_PERIOD=os.getenv('SAVINGS_QUERY_PERIOD', "21600")
 
 
 print(f"QUERY_PERIOD: {QUERY_PERIOD}")
+print(f"SAVINGS_QUERY_PERIOD: {SAVINGS_QUERY_PERIOD}")
 print(f"AWS_ACCESS_KEY_ID: {os.environ.get('AWS_ACCESS_KEY_ID')}")
 
 scheduler = BackgroundScheduler()
@@ -31,6 +36,15 @@ scheduler.add_job(
     trigger=IntervalTrigger(seconds=int(QUERY_PERIOD),start_date=(datetime.now() + timedelta(seconds=10))),
     id='aws_query',
     name='Run AWS Query',
+    replace_existing=True
+    )
+
+savings_client = Savings()
+scheduler.add_job(
+    func=savings_client.fill_metrics,
+    trigger=IntervalTrigger(seconds=int(SAVINGS_QUERY_PERIOD),start_date=(datetime.now() + timedelta(seconds=20))),
+    id='savings_query',
+    name='Run AWS Savings Query',
     replace_existing=True
     )
 
