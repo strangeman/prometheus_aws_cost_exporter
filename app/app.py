@@ -9,6 +9,7 @@ from app.aws import AWS
 from app.savings import Savings
 from app.gcp import GCP
 from app.serverscom import Serverscom
+from app.nebius import Nebius
 
 app = Flask(__name__)
 
@@ -17,10 +18,16 @@ QUERY_PERIOD=os.getenv('QUERY_PERIOD', "5400")
 # Cost Explorer bills per request and refreshes once a day, so the savings
 # metrics run far less often than the cost ones.
 SAVINGS_QUERY_PERIOD=os.getenv('SAVINGS_QUERY_PERIOD', "21600")
+# Nebius APIs are free. Spot prices move every 15 minutes, so they get their own short
+# period; costs come from a billing export that takes ~10s to build.
+NEBIUS_PRICES_QUERY_PERIOD=os.getenv('NEBIUS_PRICES_QUERY_PERIOD', "300")
+NEBIUS_COSTS_QUERY_PERIOD=os.getenv('NEBIUS_COSTS_QUERY_PERIOD', "3600")
 
 
 print(f"QUERY_PERIOD: {QUERY_PERIOD}")
 print(f"SAVINGS_QUERY_PERIOD: {SAVINGS_QUERY_PERIOD}")
+print(f"NEBIUS_PRICES_QUERY_PERIOD: {NEBIUS_PRICES_QUERY_PERIOD}")
+print(f"NEBIUS_COSTS_QUERY_PERIOD: {NEBIUS_COSTS_QUERY_PERIOD}")
 print(f"AWS_ACCESS_KEY_ID: {os.environ.get('AWS_ACCESS_KEY_ID')}")
 
 scheduler = BackgroundScheduler()
@@ -63,6 +70,22 @@ scheduler.add_job(
     trigger=IntervalTrigger(seconds=int(QUERY_PERIOD),start_date=(datetime.now() + timedelta(seconds=10))),
     id='serverscom_query',
     name='Run Servers.com Query',
+    replace_existing=True
+    )
+
+nebius_client = Nebius()
+scheduler.add_job(
+    func=nebius_client.fill_price_metrics,
+    trigger=IntervalTrigger(seconds=int(NEBIUS_PRICES_QUERY_PERIOD),start_date=(datetime.now() + timedelta(seconds=10))),
+    id='nebius_prices_query',
+    name='Run Nebius Prices Query',
+    replace_existing=True
+    )
+scheduler.add_job(
+    func=nebius_client.fill_cost_metrics,
+    trigger=IntervalTrigger(seconds=int(NEBIUS_COSTS_QUERY_PERIOD),start_date=(datetime.now() + timedelta(seconds=30))),
+    id='nebius_costs_query',
+    name='Run Nebius Costs Query',
     replace_existing=True
     )
 

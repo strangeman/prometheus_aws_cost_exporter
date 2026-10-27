@@ -35,7 +35,8 @@ slash — that's what `helm/values.yaml` annotates for scraping), health at `/he
 
 Providers — [app/aws.py](app/aws.py) (Cost Explorer), [app/gcp.py](app/gcp.py)
 (BigQuery billing export), [app/serverscom.py](app/serverscom.py) (invoice REST API),
-[app/savings.py](app/savings.py) (commitment discounts + spot) — all follow the same
+[app/savings.py](app/savings.py) (commitment discounts + spot), [app/nebius.py](app/nebius.py)
+(GPU spot/on-demand prices + FOCUS billing export, two jobs) — all follow the same
 shape: Prometheus `Gauge`s as **class attributes**, an `<X>_ENABLED` env guard, and a
 `fill_metrics()` that queries and sets. Adding a provider means adding a module in
 that shape plus a `scheduler.add_job` block in `app.py`.
@@ -73,6 +74,14 @@ Savings Plan, an instance type you stopped running) linger forever.
   copies only `pyproject.toml`/`poetry.lock`, so the root package cannot be
   built there; the runtime stage gets `/app/.venv` plus `app/` and runs
   `flask` from the venv directly (no `poetry` in the final image).
+- **Nebius SDK messages: empty is truthy.** `instance.spec.preemptible` returns an
+  empty `PreemptibleSpec` when unset, so `if spec.preemptible` is always true. Use
+  `spec.check_presence("preemptible")`. The SDK is imported inside functions in
+  `app/nebius.py` so that importing the module needs no gRPC channel or credentials;
+  calls are made synchronously with `.wait()` from the scheduler threads.
+- **Nebius costs are in UTC, the image is not.** The Dockerfile sets `TZ=Etc/GMT+3`;
+  `app/nebius.py` uses `datetime.now(timezone.utc)` so its days line up with
+  `ChargePeriodStart`. Keep it that way.
 - Naming split in the savings metrics: `aws_savings_plan_*` (singular) is per plan and
   always carries `savings_plan_id`; `aws_savings_plans_*` (plural) is the account total.
 
