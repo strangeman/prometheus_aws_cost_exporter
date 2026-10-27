@@ -4,7 +4,7 @@
 
 Are you looking for some system that alerts when your today's spending on cloud providers exceeds some limit?  That's just what this exporter is made for.
 
-The exporter is a Python server that connects to AWS Cost Explorer and GCP BigQuery with a customizable period, and exposes last responses as Prometheus metrics.
+The exporter is a Python server that connects to AWS Cost Explorer, GCP BigQuery, Servers.com and the Nebius AI Cloud billing API with a customizable period, and exposes last responses as Prometheus metrics.
 
 Alongside raw spend it can also report on **commitment discounts and spot savings**: Savings Plan and Reserved Instance utilization, and what spot actually saves against on-demand list price. See [Savings metrics](#savings-metrics).
 
@@ -24,6 +24,12 @@ Configuration is made through environment variables:
 | SAVINGS_ENABLED | Enable Savings Plan / Reserved Instance / spot savings metrics |   False |
 | SAVINGS_QUERY_PERIOD | Period to update the savings metrics, separate from `QUERY_PERIOD` |   21600 |
 | AWS_REGIONS | Regions scanned for reservations, comma-separated |   us-east-1,us-east-2,eu-west-1,us-west-1,us-west-2 |
+| NEBIUS_ENABLED | Enable Nebius AI Cloud metrics gathering |   False |
+| NEBIUS_CREDENTIALS | Nebius service account credentials JSON (see [Nebius](#nebius)) |   None |
+| NEBIUS_TENANT_ID | Nebius tenant (`tenant-…`) whose projects are scanned |   None |
+| NEBIUS_CONTRACT_ID | Nebius contract (`contract-…`) the billing export is made for |   None |
+| NEBIUS_PRICES_QUERY_PERIOD | Period to update Nebius GPU prices and running preemptible GPUs |   300 |
+| NEBIUS_COSTS_QUERY_PERIOD | Period to update Nebius costs |   3600 |
 
 `SAVINGS_QUERY_PERIOD` is deliberately separate. Cost Explorer bills $0.01 per request and refreshes its data roughly once a day, so a 30-minute loop buys no freshness and costs real money — five calls on a 1800s period run to about $70/month on their own.
 
@@ -149,6 +155,61 @@ reference price comes from the free Pricing API, cached for a day:
 Spot **interruptions** are not exported here. Karpenter already publishes them
 as `karpenter_interruption_received_messages_total{message_type="spot_interrupted"}`
 from its SQS interruption queue.
+
+## Nebius
+
+Enabled with `NEBIUS_ENABLED=true`. Implemented in `app/nebius.py` as two jobs,
+both on free APIs.
+
+### Service account
+
+A service account in the tenant's `viewers` group (tenant-wide `viewer`) is enough
+for everything below. Create a key and pass the file it writes, as is, in
+`NEBIUS_CREDENTIALS`:
+
+```sh
+nebius iam auth-public-key generate --service-account-id <serviceaccount-…> --output credentials.json
+```
+
+The contract ID is in the console: Billing → Payments → Billing details, Payer.
+
+### GPU prices (`NEBIUS_PRICES_QUERY_PERIOD`)
+
+| Metric | Labels | Source |
+| --- | --- | --- |
+| `nebius_gpu_spot_price_per_hour` | `region`, `platform` | `billing.v1alpha1.SpotPriceService/List` — every spot market, one call |
+| `nebius_gpu_on_demand_price_per_hour` | `region`, `platform` | `billing.v1.CalculatorService/EstimateBatch` on the smallest preset ÷ its GPUs, only for platforms with a spot market, once per region |
+| `nebius_preemptible_gpus` | `region`, `platform`, `nebius_project` | running preemptible VMs × GPUs of their preset, from `compute.v1.InstanceService/List` in every project of the tenant |
+
+Both prices are USD per GPU-hour. Spot markets exist only for platforms billed as
+one bundled SKU per GPU (H100, H200, B200, B300, RTX PRO 6000), so preset price ÷ GPU
+count is the GPU price. L40S bills vCPU and RAM separately and has no spot market.
+
+Since 2026-11-02 Nebius no longer keeps spot below on-demand. To catch a spot price
+above on-demand on a platform you are actually running:
+
+```promql
+(nebius_gpu_spot_price_per_hour > on(region, platform) nebius_gpu_on_demand_price_per_hour)
+  and on(region, platform) sum by (region, platform) (nebius_preemptible_gpus) > 0
+```
+
+### Costs (`NEBIUS_COSTS_QUERY_PERIOD`)
+
+Each run creates a one-time billing export (`billing.v1alpha1.OneTimeExportService`,
+FOCUS 1.2 CSV) for the current month — and the previous one on the 1st — and sums
+`BilledCost` by UTC day of `ChargePeriodStart`. Building the export takes ~10 seconds;
+the current month includes usage up to roughly an hour ago. Exports expire on the
+Nebius side after 7 days.
+
+Labelled by `nebius_project` (`x_ProjectName`), `nebius_service` (`ServiceName`) and
+`nebius_charge` (`ChargeDescription`: the line item, e.g. `Preemptible NVIDIA H100
+NVLink`, `Disk (Network SSD)` — `ServiceName` alone is nearly always `Compute`):
+`nebius_today_costs` (so far), `nebius_yesterday_costs`, `nebius_month_to_date_costs`.
+Zero sums are not exported.
+
+`nebius_costs_data_end_timestamp_seconds` is the end of the newest usage period in the
+export, and `nebius_last_success_timestamp_seconds{task="prices"|"costs"}` the last
+completed run of each job — alert on those to notice the exporter going stale.
 
 ## Development
 
