@@ -9,3 +9,13 @@ env:
   QUERY_PERIOD: 1800
   AWS_ENABLED: "true"
   GCP_ENABLED: "true"
+# NEBIUS_ENABLED needs ~350Mi: the Nebius SDK builds a ~200Mi protobuf reflection
+# registry on the first region-routed call (projects, platforms, instances).
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "256Mi"
+    cpu: "300m"
+

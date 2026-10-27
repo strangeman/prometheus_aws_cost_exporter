@@ -79,6 +79,12 @@ Savings Plan, an instance type you stopped running) linger forever.
   `spec.check_presence("preemptible")`. The SDK is imported inside functions in
   `app/nebius.py` so that importing the module needs no gRPC channel or credentials;
   calls are made synchronously with `.wait()` from the scheduler threads.
+- **The Nebius SDK costs ~200 MiB of RAM.** The first region-routed call (project,
+  platform or instance list) makes it import every API module and build a protobuf
+  reflection registry; RSS goes from ~110 to ~330 MiB and stays there. Spot prices,
+  the calculator and billing exports alone don't trigger it. With `NEBIUS_ENABLED` the
+  pod needs a 512Mi limit (`resources` in `helm/values.yaml`); 256Mi gets it OOMKilled
+  seconds after the first Nebius job starts.
 - **Nebius costs are in UTC, the image is not.** The Dockerfile sets `TZ=Etc/GMT+3`;
   `app/nebius.py` uses `datetime.now(timezone.utc)` so its days line up with
   `ChargePeriodStart`. Keep it that way.
