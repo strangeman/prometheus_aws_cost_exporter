@@ -205,3 +205,25 @@ def test_fill_price_metrics_prices_each_region_once(enabled):
     assert _value("nebius_gpu_spot_price_per_hour", **labels) == 4.6
     assert _value("nebius_gpu_on_demand_price_per_hour", **labels) == 4.5
     assert _value("nebius_preemptible_gpus", nebius_project="default-project", **labels) == 2
+
+
+def test_fill_price_metrics_skips_an_unreadable_project(enabled):
+    n = Nebius()
+    n.get_spot_prices = MagicMock(return_value={("eu-west1", "gpu-h200-sxm"): 4.8,
+                                                ("eu-north1", "gpu-h200-sxm"): 1.4})
+    n.get_projects = MagicMock(return_value=[
+        ("project-w", "default-project-eu-west1", "eu-west1"),
+        ("project-n", "default-project", "eu-north1"),
+    ])
+    n.get_gpu_presets = MagicMock(return_value={"gpu-h200-sxm": {"1gpu-16vcpu-200gb": 1}})
+    n.get_preemptible_gpus = MagicMock(side_effect=[PermissionError("permission denied"), {"gpu-h200-sxm": 1}])
+    n.get_on_demand_prices = MagicMock(return_value={"gpu-h200-sxm": 5.4})
+
+    n.fill_price_metrics()
+
+    assert _value("nebius_project_scrape_success", region="eu-west1", nebius_project="default-project-eu-west1") == 0
+    assert _value("nebius_project_scrape_success", region="eu-north1", nebius_project="default-project") == 1
+    assert _value("nebius_gpu_on_demand_price_per_hour", region="eu-north1", platform="gpu-h200-sxm") == 5.4
+    assert _value("nebius_gpu_on_demand_price_per_hour", region="eu-west1", platform="gpu-h200-sxm") is None
+    assert _value("nebius_gpu_spot_price_per_hour", region="eu-west1", platform="gpu-h200-sxm") == 4.8
+

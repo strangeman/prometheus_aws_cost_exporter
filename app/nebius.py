@@ -74,6 +74,10 @@ class Nebius:
         "nebius_costs_data_end_timestamp_seconds",
         "End of the latest usage charge period in the billing export")
 
+    nebius_project_scrape_success = Gauge(
+        "nebius_project_scrape_success",
+        "1 if the last price run could read the project's platforms, instances and prices",
+        ["region", "nebius_project"])
     nebius_last_success_timestamp_seconds = Gauge(
         "nebius_last_success_timestamp_seconds",
         "When a Nebius job last completed successfully",
@@ -188,15 +192,25 @@ class Nebius:
             return
         print(f"{datetime.now()} Getting Nebius GPU prices...")
         spot = self.get_spot_prices()
-        on_demand, running = {}, {}
+        on_demand, running, scraped = {}, {}, {}
         for project_id, project_name, region in self.get_projects():
-            presets = self.get_gpu_presets(project_id)
-            for platform, count in self.get_preemptible_gpus(project_id, presets).items():
+            # One unreadable project (e.g. a missing permission) must not cost the
+            # metrics of all the others.
+            try:
+                presets = self.get_gpu_presets(project_id)
+                project_running = self.get_preemptible_gpus(project_id, presets)
+                # a region may hold several projects; prices are per region, so one is enough
+                wanted = {pl for (r, pl) in spot if r == region and pl in presets}
+                wanted -= {pl for (r, pl) in on_demand if r == region}
+                project_on_demand = self.get_on_demand_prices(project_id, presets, wanted)
+            except Exception as e:
+                print(f"{datetime.now()} Nebius: skipping project {project_name} ({project_id}, {region}): {e}")
+                scraped[(region, project_name)] = 0
+                continue
+            scraped[(region, project_name)] = 1
+            for platform, count in project_running.items():
                 running[(region, platform, project_name)] = count
-            # a region may hold several projects; prices are per region, so one is enough
-            wanted = {pl for (r, pl) in spot if r == region and pl in presets}
-            wanted -= {pl for (r, pl) in on_demand if r == region}
-            for platform, price in self.get_on_demand_prices(project_id, presets, wanted).items():
+            for platform, price in project_on_demand.items():
                 on_demand[(region, platform)] = price
 
         self.nebius_gpu_spot_price_per_hour.clear()
@@ -208,6 +222,9 @@ class Nebius:
         self.nebius_preemptible_gpus.clear()
         for (region, platform, project), count in running.items():
             self.nebius_preemptible_gpus.labels(region, platform, project).set(count)
+        self.nebius_project_scrape_success.clear()
+        for (region, project), ok in scraped.items():
+            self.nebius_project_scrape_success.labels(region, project).set(ok)
         self.nebius_last_success_timestamp_seconds.labels("prices").set(time.time())
         print(f"{datetime.now()} Finished getting Nebius GPU prices.")
 

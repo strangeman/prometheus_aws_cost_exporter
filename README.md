@@ -207,6 +207,9 @@ NVLink`, `Disk (Network SSD)` — `ServiceName` alone is nearly always `Compute`
 `nebius_today_costs` (so far), `nebius_yesterday_costs`, `nebius_month_to_date_costs`.
 Zero sums are not exported.
 
+`nebius_project_scrape_success{region, nebius_project}` is 0 for a project the last price run
+could not read (it is skipped; the rest still update).
+
 `nebius_costs_data_end_timestamp_seconds` is the end of the newest usage period in the
 export, and `nebius_last_success_timestamp_seconds{task="prices"|"costs"}` the last
 completed run of each job — alert on those to notice the exporter going stale.
